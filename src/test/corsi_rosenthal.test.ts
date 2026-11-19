@@ -4,46 +4,99 @@ import {
   getDefaultCorsiRosenthalConfig,
 } from '../core/symbolic/corsi_rosenthal';
 
-describe('Corsi-Rosenthal Box Purifier Symbolic Engine', () => {
-  it('computes room volume and CADR accurately for default 16x14x9 room', () => {
-    const config = getDefaultCorsiRosenthalConfig();
+describe('Corsi-Rosenthal Box Purifier Fluid Dynamic Solver', () => {
+  it('calculates default 4-filter MERV-13 medium-speed metrics accurately', () => {
+    const config = getDefaultCorsiRosenthalConfig(); // 16x14x9 room, 4 MERV-13 filters, Medium speed, Carbon pad
     const metrics = calculateCorsiRosenthalMetrics(config);
 
-    // 16 * 14 * 9 = 2016 cubic feet
     expect(metrics.roomVolumeCuFt).toBe(2016);
-    expect(metrics.roomVolumeM3).toBeCloseTo(57.1, 1);
-
-    // CADR should be in realistic high-efficiency range (300 - 600 CFM)
-    expect(metrics.effectiveCadrCfm).toBeGreaterThan(300);
-    expect(metrics.effectiveCadrCfm).toBeLessThan(650);
-
-    // ACH = (CADR * 60) / 2016 -> should achieve > 6 ACH (Hospital Grade)
-    expect(metrics.airChangesPerHour).toBeGreaterThanOrEqual(6.0);
+    expect(metrics.effectiveCadrCfm).toBe(349);
+    expect(metrics.airChangesPerHour).toBeGreaterThanOrEqual(10);
     expect(metrics.achRating).toBe('Ideal Hospital-Grade');
 
-    // Clearance half-life should be under 10 minutes
-    expect(metrics.pm25HalfLifeMinutes).toBeLessThan(10);
-    expect(metrics.timeToClean90PctMinutes).toBeLessThan(25);
+    // Exponential clearance physics: 90% and 99% times should be physically realistic (< 30 mins)
+    expect(metrics.pm25HalfLifeMinutes).toBeLessThan(5);
+    expect(metrics.timeToClean90PctMinutes).toBeLessThan(15);
+    expect(metrics.timeToClean99PctMinutes).toBeLessThan(30);
+
+    // Build cost should be well under $100
+    expect(metrics.estimatedBuildCostUsd).toBeLessThan(100);
+    expect(metrics.estimatedBuildCostUsd).toBeGreaterThan(60);
   });
 
-  it('reflects higher performance with 5-filter configuration vs 4-filter', () => {
-    const config4 = { ...getDefaultCorsiRosenthalConfig(), filterCount: 4 as const };
-    const config5 = { ...getDefaultCorsiRosenthalConfig(), filterCount: 5 as const };
+  it('calculates high-speed shroud configuration delivering maximum protection ACH', () => {
+    const highSpeedConfig = {
+      ...getDefaultCorsiRosenthalConfig(),
+      fanSpeedSetting: 'High' as const,
+      hasCarbonLayer: false,
+    };
+    const metrics = calculateCorsiRosenthalMetrics(highSpeedConfig);
 
-    const metrics4 = calculateCorsiRosenthalMetrics(config4);
-    const metrics5 = calculateCorsiRosenthalMetrics(config5);
+    expect(metrics.effectiveCadrCfm).toBeGreaterThan(450);
+    expect(metrics.airChangesPerHour).toBeGreaterThanOrEqual(12);
+    expect(metrics.achRating).toBe('Maximum Protection');
+  });
+
+  it('proves 5-filter compactor plenum outperforms 4-filter cube in CADR', () => {
+    const baseConfig = getDefaultCorsiRosenthalConfig();
+    const metrics4 = calculateCorsiRosenthalMetrics({ ...baseConfig, filterCount: 4 });
+    const metrics5 = calculateCorsiRosenthalMetrics({ ...baseConfig, filterCount: 5 });
 
     expect(metrics5.effectiveCadrCfm).toBeGreaterThan(metrics4.effectiveCadrCfm);
     expect(metrics5.airChangesPerHour).toBeGreaterThan(metrics4.airChangesPerHour);
     expect(metrics5.estimatedFilterLifespanDays).toBeGreaterThan(metrics4.estimatedFilterLifespanDays);
   });
 
-  it('adjusts CADR properly across fan speed settings', () => {
-    const low = calculateCorsiRosenthalMetrics({ ...getDefaultCorsiRosenthalConfig(), fanSpeedSetting: 'Low' });
-    const med = calculateCorsiRosenthalMetrics({ ...getDefaultCorsiRosenthalConfig(), fanSpeedSetting: 'Medium' });
-    const high = calculateCorsiRosenthalMetrics({ ...getDefaultCorsiRosenthalConfig(), fanSpeedSetting: 'High' });
+  it('evaluates fan speed attenuation across High, Medium, and Low settings', () => {
+    const base = getDefaultCorsiRosenthalConfig();
+    const high = calculateCorsiRosenthalMetrics({ ...base, fanSpeedSetting: 'High' });
+    const med = calculateCorsiRosenthalMetrics({ ...base, fanSpeedSetting: 'Medium' });
+    const low = calculateCorsiRosenthalMetrics({ ...base, fanSpeedSetting: 'Low' });
 
-    expect(low.effectiveCadrCfm).toBeLessThan(med.effectiveCadrCfm);
-    expect(med.effectiveCadrCfm).toBeLessThan(high.effectiveCadrCfm);
+    expect(high.effectiveCadrCfm).toBeGreaterThan(med.effectiveCadrCfm);
+    expect(med.effectiveCadrCfm).toBeGreaterThan(low.effectiveCadrCfm);
+  });
+
+  it('models activated carbon layer impedance and cost inclusion', () => {
+    const base = getDefaultCorsiRosenthalConfig();
+    const withoutCarbon = calculateCorsiRosenthalMetrics({ ...base, hasCarbonLayer: false });
+    const withCarbon = calculateCorsiRosenthalMetrics({ ...base, hasCarbonLayer: true });
+
+    // Carbon adds ~6% impedance to air flow
+    expect(withCarbon.effectiveCadrCfm).toBeLessThan(withoutCarbon.effectiveCadrCfm);
+    // But adds ~$15 to total build cost
+    expect(withCarbon.estimatedBuildCostUsd).toBe(withoutCarbon.estimatedBuildCostUsd + 15);
+  });
+
+  it('correctly tiers ACH ratings for large volume spaces', () => {
+    const base = getDefaultCorsiRosenthalConfig();
+    // Huge hall (35 x 30 x 14 ft = 14,700 cu ft)
+    const largeRoom = calculateCorsiRosenthalMetrics({
+      ...base,
+      roomLengthFt: 35,
+      roomWidthFt: 30,
+      roomHeightFt: 14,
+      fanSpeedSetting: 'Low',
+    });
+
+    expect(largeRoom.airChangesPerHour).toBeLessThan(3);
+    expect(largeRoom.achRating).toBe('Insufficient');
+  });
+
+  it('handles zero room dimensions gracefully without dividing by zero', () => {
+    const zeroRoom = calculateCorsiRosenthalMetrics({
+      roomLengthFt: 0,
+      roomWidthFt: 0,
+      roomHeightFt: 0,
+      fanNominalCfm: 2000,
+      filterCount: 4,
+      filterMerv: 13,
+      hasCarbonLayer: false,
+      fanSpeedSetting: 'High',
+    });
+
+    expect(zeroRoom.roomVolumeCuFt).toBe(0);
+    expect(zeroRoom.airChangesPerHour).toBe(0);
+    expect(zeroRoom.pm25HalfLifeMinutes).toBe(0);
   });
 });

@@ -1,15 +1,45 @@
 import { AirQualityState, HourlyForecastPoint, LocationData, PollutantReadings } from '../../types';
 import { calculateIndiaNaqi, calculateUsAqi, getAqiCategory } from '../symbolic/aqi_calculator';
 import { computeInversionDynamics } from '../symbolic/thermal_inversion';
+import { APP_CONFIG } from '../../constants';
 
 interface CacheEntry {
   timestamp: number;
   data: AirQualityState;
 }
 
-const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
+interface OpenMeteoHourlyAqi {
+  time?: string[];
+  pm10?: number[];
+  pm2_5?: number[];
+  carbon_monoxide?: number[];
+  nitrogen_dioxide?: number[];
+  sulphur_dioxide?: number[];
+  ozone?: number[];
+  us_aqi?: number[];
+}
 
+interface OpenMeteoAqiPayload {
+  hourly?: OpenMeteoHourlyAqi;
+}
+
+interface OpenMeteoHourlyWeather {
+  temperature_2m?: number[];
+  relative_humidity_2m?: number[];
+  wind_speed_10m?: number[];
+}
+
+interface OpenMeteoWeatherPayload {
+  hourly?: OpenMeteoHourlyWeather;
+}
+
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = APP_CONFIG.CACHE_TTL_MS;
+
+/**
+ * Fetches real-time air speciation and boundary layer meteorology from Open-Meteo APIs.
+ * Includes in-memory caching, network timeout controls, and a deterministic synthetic winter smog fallback.
+ */
 export async function fetchLiveAirQuality(location: LocationData): Promise<AirQualityState> {
   const cacheKey = `${location.latitude.toFixed(3)},${location.longitude.toFixed(3)}`;
   const cached = cache.get(cacheKey);
@@ -19,54 +49,65 @@ export async function fetchLiveAirQuality(location: LocationData): Promise<AirQu
     return cached.data;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), APP_CONFIG.NETWORK_TIMEOUT_MS);
+
   try {
-    // Open-Meteo Air Quality API (No API key required)
+    // Open-Meteo Air Quality API (Zero API key required)
     const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${location.latitude}&longitude=${location.longitude}&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi&timezone=auto&forecast_days=2`;
     
     // Open-Meteo Weather API for boundary layer temperature, wind, and humidity
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=auto&forecast_days=2`;
 
     const [aqiRes, weatherRes] = await Promise.all([
-      fetch(aqiUrl),
-      fetch(weatherUrl)
+      fetch(aqiUrl, { signal: controller.signal }),
+      fetch(weatherUrl, { signal: controller.signal }),
     ]);
 
     if (!aqiRes.ok || !weatherRes.ok) {
-      throw new Error('Upstream meteorological data stream unavailable');
+      throw new Error(`Upstream meteorological data stream unavailable (AQI: ${aqiRes.status}, Weather: ${weatherRes.status})`);
     }
 
-    const aqiData = await aqiRes.json();
-    const weatherData = await weatherRes.json();
+    const aqiData: OpenMeteoAqiPayload = await aqiRes.json();
+    const weatherData: OpenMeteoWeatherPayload = await weatherRes.json();
 
     const result = parseOpenMeteoPayload(location, aqiData, weatherData);
     cache.set(cacheKey, { timestamp: now, data: result });
     return result;
   } catch (err) {
     console.warn('Real-time meteorological fetch error, falling back to deterministic local model:', err);
-    const fallback = generateSyntheticWinterSmogState(location);
-    return fallback;
+    return generateSyntheticWinterSmogState(location);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
-function parseOpenMeteoPayload(location: LocationData, aqiData: any, weatherData: any): AirQualityState {
+/**
+ * Parses raw JSON responses from Open-Meteo into the typed AirQualityState schema.
+ */
+export function parseOpenMeteoPayload(
+  location: LocationData,
+  aqiData: OpenMeteoAqiPayload,
+  weatherData: OpenMeteoWeatherPayload
+): AirQualityState {
+  const hourlyTimes: string[] = aqiData.hourly?.time ?? [];
   const currentHourIndex = Math.min(
     new Date().getHours(),
-    (aqiData?.hourly?.time?.length || 24) - 1
+    Math.max(0, hourlyTimes.length - 1)
   );
 
-  const hourlyTimes: string[] = aqiData.hourly.time || [];
-  const pm25Arr: number[] = aqiData.hourly.pm2_5 || [];
-  const pm10Arr: number[] = aqiData.hourly.pm10 || [];
-  const no2Arr: number[] = aqiData.hourly.nitrogen_dioxide || [];
-  const so2Arr: number[] = aqiData.hourly.sulphur_dioxide || [];
-  const coArr: number[] = aqiData.hourly.carbon_monoxide || [];
-  const o3Arr: number[] = aqiData.hourly.ozone || [];
+  const pm25Arr: number[] = aqiData.hourly?.pm2_5 ?? [];
+  const pm10Arr: number[] = aqiData.hourly?.pm10 ?? [];
+  const no2Arr: number[] = aqiData.hourly?.nitrogen_dioxide ?? [];
+  const so2Arr: number[] = aqiData.hourly?.sulphur_dioxide ?? [];
+  const coArr: number[] = aqiData.hourly?.carbon_monoxide ?? [];
+  const o3Arr: number[] = aqiData.hourly?.ozone ?? [];
 
-  const tempArr: number[] = weatherData.hourly?.temperature_2m || [];
-  const windArr: number[] = weatherData.hourly?.wind_speed_10m || [];
-  const humidityArr: number[] = weatherData.hourly?.relative_humidity_2m || [];
+  const tempArr: number[] = weatherData.hourly?.temperature_2m ?? [];
+  const windArr: number[] = weatherData.hourly?.wind_speed_10m ?? [];
+  const humidityArr: number[] = weatherData.hourly?.relative_humidity_2m ?? [];
 
-  // Extract current readings
+  // Extract current readings with fallback defaults
   const currentPm25 = pm25Arr[currentHourIndex] ?? 45;
   const currentPm10 = pm10Arr[currentHourIndex] ?? 85;
   const currentNo2 = no2Arr[currentHourIndex] ?? 35;
@@ -102,7 +143,7 @@ function parseOpenMeteoPayload(location: LocationData, aqiData: any, weatherData
   const totalHours = Math.min(24, hourlyTimes.length);
 
   for (let i = 0; i < totalHours; i++) {
-    const rawTime = hourlyTimes[i];
+    const rawTime = hourlyTimes[i] ?? `T${String(i).padStart(2, '0')}:00`;
     const hourVal = new Date(rawTime).getHours();
     const p25 = pm25Arr[i] ?? 35;
     const p10 = pm10Arr[i] ?? 70;
@@ -123,7 +164,7 @@ function parseOpenMeteoPayload(location: LocationData, aqiData: any, weatherData
     const hIn = calculateIndiaNaqi(hourPollutants).aqi;
     const hAtmo = computeInversionDynamics(hourVal, temp, wind, hum);
 
-    // Recommended outdoor window: daylight solar mixing (11:00 - 15:30) with low inversion risk
+    // Recommended outdoor window: daylight solar mixing (11:00 - 15:30) with non-extreme inversion risk
     const isOutdoorOk = hourVal >= 11 && hourVal <= 15 && hAtmo.inversionTrappingRisk !== 'Extreme';
 
     hourly.push({
@@ -140,6 +181,11 @@ function parseOpenMeteoPayload(location: LocationData, aqiData: any, weatherData
     });
   }
 
+  // If hourly array was empty (upstream missing time array), synthesize 24 points
+  if (hourly.length === 0) {
+    return generateSyntheticWinterSmogState(location);
+  }
+
   return {
     location,
     timestamp: new Date().toISOString(),
@@ -154,6 +200,10 @@ function parseOpenMeteoPayload(location: LocationData, aqiData: any, weatherData
   };
 }
 
+/**
+ * Deterministic biophysical fallback model generating diurnal winter smog curves
+ * based on latitude and regional pollution baselines.
+ */
 export function generateSyntheticWinterSmogState(location: LocationData): AirQualityState {
   const currentHour = new Date().getHours();
   // Typical winter smog diurnal pattern: nocturnal spike at 07:00, dip at 13:00, secondary spike at 21:00

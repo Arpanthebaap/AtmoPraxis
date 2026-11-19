@@ -6,6 +6,11 @@ import {
   getDefaultCorsiRosenthalConfig,
 } from '../core/symbolic/corsi_rosenthal';
 
+/**
+ * Interactive Corsi-Rosenthal Box Purifier Studio.
+ * Allows users to model DIY hospital-grade air filtration fluid dynamics,
+ * Clean Air Delivery Rate (CADR), and room clearance half-lives.
+ */
 export const CorsiRosenthalStudio: React.FC = () => {
   const [config, setConfig] = useState<CorsiRosenthalConfig>(getDefaultCorsiRosenthalConfig());
   const metrics = calculateCorsiRosenthalMetrics(config);
@@ -19,7 +24,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-              <Fan className="w-5 h-5 text-emerald-400" />
+              <Fan className="w-5 h-5 text-emerald-400" aria-hidden="true" />
               <span>Corsi-Rosenthal Box Purifier Studio (Indoor Air Bio-Hack)</span>
             </h2>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold font-mono">
@@ -33,7 +38,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
 
         {/* Cost Comparison Badge */}
         <div className="bg-slate-950 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl flex items-center space-x-2 text-xs">
-          <DollarSign className="w-4 h-4 text-emerald-400" />
+          <DollarSign className="w-4 h-4 text-emerald-400" aria-hidden="true" />
           <span className="text-slate-300">
             DIY Build Cost:{' '}
             <strong className="text-emerald-400 font-mono text-sm">
@@ -55,14 +60,20 @@ export const CorsiRosenthalStudio: React.FC = () => {
           {/* Length */}
           <div>
             <div className="flex justify-between text-xs text-slate-300 mb-1">
-              <span>Room Length:</span>
+              <label htmlFor="room-length-input" className="cursor-pointer">Room Length:</label>
               <span className="font-mono font-bold text-emerald-400">{config.roomLengthFt} ft</span>
             </div>
             <input
+              id="room-length-input"
               type="range"
               min={8}
               max={35}
               value={config.roomLengthFt}
+              aria-label="Room Length in feet"
+              aria-valuemin={8}
+              aria-valuemax={35}
+              aria-valuenow={config.roomLengthFt}
+              aria-valuetext={`${config.roomLengthFt} feet`}
               onChange={(e) => setConfig({ ...config, roomLengthFt: Number(e.target.value) })}
               className="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
             />
@@ -71,14 +82,20 @@ export const CorsiRosenthalStudio: React.FC = () => {
           {/* Width */}
           <div>
             <div className="flex justify-between text-xs text-slate-300 mb-1">
-              <span>Room Width:</span>
+              <label htmlFor="room-width-input" className="cursor-pointer">Room Width:</label>
               <span className="font-mono font-bold text-emerald-400">{config.roomWidthFt} ft</span>
             </div>
             <input
+              id="room-width-input"
               type="range"
               min={8}
               max={30}
               value={config.roomWidthFt}
+              aria-label="Room Width in feet"
+              aria-valuemin={8}
+              aria-valuemax={30}
+              aria-valuenow={config.roomWidthFt}
+              aria-valuetext={`${config.roomWidthFt} feet`}
               onChange={(e) => setConfig({ ...config, roomWidthFt: Number(e.target.value) })}
               className="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
             />
@@ -87,14 +104,20 @@ export const CorsiRosenthalStudio: React.FC = () => {
           {/* Height */}
           <div>
             <div className="flex justify-between text-xs text-slate-300 mb-1">
-              <span>Ceiling Height:</span>
+              <label htmlFor="room-height-input" className="cursor-pointer">Ceiling Height:</label>
               <span className="font-mono font-bold text-emerald-400">{config.roomHeightFt} ft</span>
             </div>
             <input
+              id="room-height-input"
               type="range"
               min={7}
               max={16}
               value={config.roomHeightFt}
+              aria-label="Room Ceiling Height in feet"
+              aria-valuemin={7}
+              aria-valuemax={16}
+              aria-valuenow={config.roomHeightFt}
+              aria-valuetext={`${config.roomHeightFt} feet`}
               onChange={(e) => setConfig({ ...config, roomHeightFt: Number(e.target.value) })}
               className="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
             />
@@ -108,10 +131,15 @@ export const CorsiRosenthalStudio: React.FC = () => {
             {/* Filter Count & MERV Selection */}
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Plenum Geometry</label>
-                <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                <span id="plenum-label" className="block text-slate-400 mb-1 font-medium">Plenum Geometry</span>
+                <div 
+                  role="group" 
+                  aria-labelledby="plenum-label"
+                  className="flex bg-slate-900 p-1 rounded-lg border border-slate-800"
+                >
                   <button
                     type="button"
+                    aria-pressed={config.filterCount === 4}
                     onClick={() => setConfig({ ...config, filterCount: 4 })}
                     className={`flex-1 py-1 rounded text-center font-medium transition-all ${
                       config.filterCount === 4
@@ -123,6 +151,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    aria-pressed={config.filterCount === 5}
                     onClick={() => setConfig({ ...config, filterCount: 5 })}
                     className={`flex-1 py-1 rounded text-center font-medium transition-all ${
                       config.filterCount === 5
@@ -136,10 +165,15 @@ export const CorsiRosenthalStudio: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Filter Efficiency</label>
-                <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                <span id="efficiency-label" className="block text-slate-400 mb-1 font-medium">Filter Efficiency</span>
+                <div 
+                  role="group"
+                  aria-labelledby="efficiency-label"
+                  className="flex bg-slate-900 p-1 rounded-lg border border-slate-800"
+                >
                   <button
                     type="button"
+                    aria-pressed={config.filterMerv === 13}
                     onClick={() => setConfig({ ...config, filterMerv: 13 })}
                     className={`flex-1 py-1 rounded text-center font-medium transition-all ${
                       config.filterMerv === 13
@@ -151,6 +185,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    aria-pressed={config.filterMerv === 14}
                     onClick={() => setConfig({ ...config, filterMerv: 14 })}
                     className={`flex-1 py-1 rounded text-center font-medium transition-all ${
                       config.filterMerv === 14
@@ -167,12 +202,17 @@ export const CorsiRosenthalStudio: React.FC = () => {
             {/* Fan Speed & Carbon Pad */}
             <div className="grid grid-cols-2 gap-3 text-xs pt-1">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Fan Speed Mode</label>
-                <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                <span id="speed-label" className="block text-slate-400 mb-1 font-medium">Fan Speed Mode</span>
+                <div 
+                  role="group"
+                  aria-labelledby="speed-label"
+                  className="flex bg-slate-900 p-1 rounded-lg border border-slate-800"
+                >
                   {(['Low', 'Medium', 'High'] as const).map((spd) => (
                     <button
                       key={spd}
                       type="button"
+                      aria-pressed={config.fanSpeedSetting === spd}
                       onClick={() => setConfig({ ...config, fanSpeedSetting: spd })}
                       className={`flex-1 py-1 rounded text-center font-medium transition-all ${
                         config.fanSpeedSetting === spd
@@ -189,6 +229,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
               <div className="flex flex-col justify-end">
                 <button
                   type="button"
+                  aria-pressed={config.hasCarbonLayer}
                   onClick={() => setConfig({ ...config, hasCarbonLayer: !config.hasCarbonLayer })}
                   className={`w-full py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-between transition-all ${
                     config.hasCarbonLayer
@@ -204,7 +245,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
                         : 'border-slate-700'
                     }`}
                   >
-                    {config.hasCarbonLayer && <Check className="w-3 h-3 stroke-[3]" />}
+                    {config.hasCarbonLayer && <Check className="w-3 h-3 stroke-[3]" aria-hidden="true" />}
                   </div>
                 </button>
               </div>
@@ -213,7 +254,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
         </div>
 
         {/* Right: Calculated Metrics & Performance Dashboard */}
-        <div className="space-y-4">
+        <div className="space-y-4" aria-live="polite">
           <div className="grid grid-cols-2 gap-3">
             {/* Effective CADR */}
             <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
@@ -270,7 +311,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
             </div>
 
             <div className="text-[11px] text-slate-400 leading-relaxed bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/60 flex items-start space-x-2">
-              <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <span>
                 <strong>Crucial DIY Bio-Hack: </strong> Always attach a 15-inch circular cardboard{' '}
                 <strong className="text-emerald-300">fan shroud</strong> to the front exhaust face of
@@ -283,7 +324,7 @@ export const CorsiRosenthalStudio: React.FC = () => {
           {/* Assembly Checklist Accordion Snippet */}
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
             <div className="text-xs font-semibold text-white flex items-center space-x-1.5 mb-2">
-              <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+              <Wrench className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
               <span>Bill of Materials &amp; Assembly Steps</span>
             </div>
             <ul className="text-xs text-slate-300 space-y-1.5 list-disc list-inside">

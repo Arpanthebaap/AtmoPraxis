@@ -1,4 +1,21 @@
 import { LocationData } from '../../types';
+import { APP_CONFIG } from '../../constants';
+
+interface GeocodingResultItem {
+  id?: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  timezone?: string;
+  country_code?: string;
+  country?: string;
+  admin1?: string;
+}
+
+interface GeocodingApiResponse {
+  results?: GeocodingResultItem[];
+}
 
 export const PRESET_LOCATIONS: LocationData[] = [
   { city: 'Delhi', country: 'India', countryCode: 'IN', latitude: 28.6139, longitude: 77.2090, timezone: 'Asia/Kolkata' },
@@ -13,6 +30,9 @@ export const PRESET_LOCATIONS: LocationData[] = [
   { city: 'Tokyo', country: 'Japan', countryCode: 'JP', latitude: 35.6762, longitude: 139.6503, timezone: 'Asia/Tokyo' },
 ];
 
+/**
+ * Searches global cities using Open-Meteo Geocoding API with local preset matching and deduplication.
+ */
 export async function searchLocations(query: string): Promise<LocationData[]> {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed || trimmed.length < 2) {
@@ -24,14 +44,18 @@ export async function searchLocations(query: string): Promise<LocationData[]> {
     loc => loc.city.toLowerCase().includes(trimmed) || loc.country.toLowerCase().includes(trimmed)
   );
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), APP_CONFIG.NETWORK_TIMEOUT_MS);
+
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en&format=json`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Geocoding response failed');
-    const data = await response.json();
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Geocoding response failed with status ${response.status}`);
+    
+    const data: GeocodingApiResponse = await response.json();
 
     if (data.results && Array.isArray(data.results)) {
-      const liveResults: LocationData[] = data.results.map((r: any) => ({
+      const liveResults: LocationData[] = data.results.map((r: GeocodingResultItem) => ({
         city: r.name,
         country: r.country || '',
         countryCode: r.country_code || '',
@@ -50,6 +74,8 @@ export async function searchLocations(query: string): Promise<LocationData[]> {
     }
   } catch (err) {
     console.warn('Geocoding fetch failed, falling back to preset index:', err);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   return matchingPresets.length > 0 ? matchingPresets : PRESET_LOCATIONS.slice(0, 5);

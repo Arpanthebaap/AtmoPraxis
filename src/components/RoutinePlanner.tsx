@@ -9,6 +9,11 @@ interface RoutinePlannerProps {
   hasApiKey: boolean;
 }
 
+/**
+ * Low-Emission Daily Routine Studio.
+ * Generates spatiotemporally optimized daily schedules tailored to user personas
+ * (Families, Commuters, Elderly/Vulnerable, Athletes) to avoid peak winter inversion smog.
+ */
 export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey }) => {
   const [targetAudience, setTargetAudience] = useState<
     'Family with Children' | 'Working Commuters' | 'Elderly / Vulnerable' | 'Active Fitness'
@@ -45,7 +50,7 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
         <div>
           <div className="flex items-center space-x-2">
             <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-              <Calendar className="w-5 h-5 text-emerald-400" />
+              <Calendar className="w-5 h-5 text-emerald-400" aria-hidden="true" />
               <span>Low-Emission Daily Routine Studio</span>
             </h2>
             <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
@@ -66,12 +71,12 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
         >
           {isGenerating ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               <span>Synthesizing Optimal Schedule...</span>
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4" aria-hidden="true" />
               <span>{hasApiKey ? 'Generate via Gemini 2.5' : 'Optimize Daily Routine'}</span>
             </>
           )}
@@ -82,16 +87,21 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Persona Selector */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
-            <Users className="w-3.5 h-3.5 text-emerald-400" />
+          <span id="persona-label" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
+            <Users className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
             <span>Target Household Persona</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
+          </span>
+          <div 
+            role="group"
+            aria-labelledby="persona-label"
+            className="grid grid-cols-2 gap-2"
+          >
             {(['Family with Children', 'Working Commuters', 'Elderly / Vulnerable', 'Active Fitness'] as const).map(
               (persona) => (
                 <button
                   key={persona}
                   type="button"
+                  aria-pressed={targetAudience === persona}
                   onClick={() => setTargetAudience(persona)}
                   className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${
                     targetAudience === persona
@@ -108,15 +118,20 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
 
         {/* Commute Selector */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
-            <Car className="w-3.5 h-3.5 text-emerald-400" />
+          <span id="commute-label" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
+            <Car className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
             <span>Baseline Commuting Method</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
+          </span>
+          <div 
+            role="group"
+            aria-labelledby="commute-label"
+            className="grid grid-cols-2 gap-2"
+          >
             {['Petrol/Diesel Car', 'Metro / Electrified Rail', 'Bicycle / Walking', 'Electric Vehicle'].map((mode) => (
               <button
                 key={mode}
                 type="button"
+                aria-pressed={commuteMode === mode}
                 onClick={() => setCommuteMode(mode)}
                 className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${
                   commuteMode === mode
@@ -132,7 +147,10 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
       </div>
 
       {/* Routine Plan Summary Banner */}
-      <div className="p-4 rounded-xl bg-gradient-to-r from-slate-950 to-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div 
+        aria-live="polite"
+        className="p-4 rounded-xl bg-gradient-to-r from-slate-950 to-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+      >
         <div>
           <div className="text-sm font-bold text-white">{plan.headline}</div>
           <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
@@ -152,7 +170,7 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
       {/* Timeline Routine Cards */}
       <div className="space-y-3">
         <h3 className="text-xs uppercase font-semibold tracking-wider text-slate-400">
-          Synchronized Activity Milestones & Bio-Shielding Protocol
+          Synchronized Activity Milestones &amp; Bio-Shielding Protocol
         </h3>
 
         <div className="grid grid-cols-1 gap-3">
@@ -167,7 +185,7 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ state, hasApiKey
                   <span className="text-xs font-mono font-bold text-slate-400 line-through">
                     {item.timeSlot}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
                   <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30">
                     {item.optimizedTimeSlot}
                   </span>
