@@ -1,4 +1,5 @@
 import { AtmosphericDynamics } from '../../types';
+import { ATMOSPHERE_THRESHOLDS } from '../../constants';
 
 /**
  * Deterministic Boundary Layer & Thermal Inversion Trapping Solver.
@@ -20,39 +21,49 @@ export interface InversionAnalysisResult {
   scientificExplanation: string;
 }
 
+/**
+ * Evaluates tropospheric boundary layer height, temperature gradient, and smog trapping risk.
+ *
+ * @param hour Local hour of day (0 - 23).
+ * @param temp2m Ambient 2-meter air temperature in °C.
+ * @param windSpeedKmH Surface 10-meter wind speed in km/h.
+ * @param humidity Relative humidity percentage (0 - 100).
+ * @returns Atmospheric dynamics object with boundary layer depth and trapping risk level.
+ */
 export function computeInversionDynamics(
   hour: number,
   temp2m: number,
   windSpeedKmH: number,
   humidity: number
 ): AtmosphericDynamics {
+  const safeWind = Math.max(0, windSpeedKmH);
+  const safeHumidity = Math.max(0, Math.min(100, humidity));
+
   // Model nocturnal inversion based on diurnal cycle and wind speed
-  // Typically, winter nocturnal inversion peaks between 22:00 and 08:30
   const isNocturnal = hour >= 20 || hour <= 8;
   const isPeakMorningInversion = hour >= 5 && hour <= 9;
 
-  // Stagnant wind (< 6 km/h) prevents mechanical turbulence and strengthens trapping
-  const windFactor = Math.max(0.1, 1 - windSpeedKmH / 20);
+  // Stagnant wind prevents mechanical turbulence and strengthens trapping
+  const windFactor = Math.max(0.1, 1 - safeWind / 20);
 
   // Boundary layer height (meters): 
   // In sunny afternoons: 800 - 1500m; In winter smog nights/early mornings: 80 - 250m
   let basePblHeight: number;
   if (isPeakMorningInversion) {
-    basePblHeight = 120 + (windSpeedKmH * 8);
+    basePblHeight = 120 + (safeWind * 8);
   } else if (isNocturnal) {
-    basePblHeight = 180 + (windSpeedKmH * 10);
+    basePblHeight = 180 + (safeWind * 10);
   } else {
     // Solar insolation expands mixing layer
     const middaySolarEffect = Math.sin(((hour - 8) / 10) * Math.PI);
-    basePblHeight = 450 + Math.max(0, middaySolarEffect * 850) + (windSpeedKmH * 15);
+    basePblHeight = 450 + Math.max(0, middaySolarEffect * 850) + (safeWind * 15);
   }
   const boundaryLayerHeight = Math.round(Math.max(80, Math.min(1800, basePblHeight)));
 
   // Calculate Inversion Trapping Score (0 to 100)
-  // Low boundary layer + low wind + high humidity = extreme smog trap
-  const pblPenalty = Math.max(0, (1 - boundaryLayerHeight / 800) * 50);
+  const pblPenalty = Math.max(0, (1 - boundaryLayerHeight / ATMOSPHERE_THRESHOLDS.GOOD_DISPERSION_HEIGHT_METERS) * 50);
   const stagnationPenalty = windFactor * 35;
-  const humidityPenalty = (humidity / 100) * 15;
+  const humidityPenalty = (safeHumidity / 100) * 15;
   
   let trappingScore = Math.round(pblPenalty + stagnationPenalty + humidityPenalty);
   trappingScore = Math.max(5, Math.min(99, trappingScore));
@@ -67,13 +78,13 @@ export function computeInversionDynamics(
 
   // Temperature inversion strength (°C gradient)
   const inversionStrength = isNocturnal 
-    ? Number((2.8 * windFactor + (humidity > 70 ? 1.2 : 0)).toFixed(1))
+    ? Number((2.8 * windFactor + (safeHumidity > 70 ? 1.2 : 0)).toFixed(1))
     : Number((0.2 * (1 - windFactor)).toFixed(1));
 
   return {
     temperature2m: temp2m,
-    relativeHumidity: humidity,
-    windSpeed10m: windSpeedKmH,
+    relativeHumidity: safeHumidity,
+    windSpeed10m: safeWind,
     boundaryLayerHeight,
     inversionStrength,
     inversionTrappingRisk: trappingRisk,
@@ -81,6 +92,12 @@ export function computeInversionDynamics(
   };
 }
 
+/**
+ * Assesses biological and operational safety based on evaluated atmospheric dynamics.
+ *
+ * @param dynamics Atmospheric sounding and boundary layer parameters.
+ * @returns Inversion analysis with actionable public health recommendations.
+ */
 export function evaluateInversionSafety(dynamics: AtmosphericDynamics): InversionAnalysisResult {
   const windSpeedMs = (dynamics.windSpeed10m * 1000) / 3600;
   // Ventilation Coefficient (VC) = Mixing Height (m) * Wind Speed (m/s)

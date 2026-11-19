@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
-import { Search, MapPin, Loader2, Navigation } from 'lucide-react';
+import { Search, MapPin, Loader2, Navigation, AlertCircle } from 'lucide-react';
 import { LocationData } from '../types';
 import { PRESET_LOCATIONS, searchLocations } from '../core/api/geocoding';
 
-interface LocationSelectorProps {
+export interface LocationSelectorProps {
   currentLocation: LocationData;
   onSelectLocation: (location: LocationData) => void;
   isLoading: boolean;
@@ -23,6 +23,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +65,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     setQuery('');
     setIsOpen(false);
     setHighlightedIndex(-1);
+    setGeoError(null);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -92,9 +94,10 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   };
 
   const handleDetectLocation = () => {
-    if (navigator.geolocation) {
+    setGeoError(null);
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        async (position) => {
+        (position) => {
           const loc: LocationData = {
             city: 'My Local Position',
             country: 'Detected',
@@ -107,9 +110,11 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         },
         (error) => {
           console.warn('Geolocation error:', error);
-          alert('Could not retrieve device location. Please search for your city.');
+          setGeoError('GPS access was not granted. Please select your city from the high-smog list or search below.');
         }
       );
+    } else {
+      setGeoError('Device geolocation is not supported in this browser environment.');
     }
   };
 
@@ -138,6 +143,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
               onChange={(e) => {
                 setQuery(e.target.value);
                 setIsOpen(true);
+                if (geoError) setGeoError(null);
               }}
               onFocus={() => {
                 if (results.length > 0) setIsOpen(true);
@@ -204,6 +210,17 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         </button>
       </div>
 
+      {geoError && (
+        <div 
+          role="alert" 
+          aria-live="polite"
+          className="flex items-center space-x-2 text-xs text-amber-300 bg-amber-950/40 border border-amber-500/30 p-2.5 rounded-xl"
+        >
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" aria-hidden="true" />
+          <span>{geoError}</span>
+        </div>
+      )}
+
       {/* Preset Location Quick Chips */}
       <nav 
         aria-label="High Smog Corridors quick selection"
@@ -219,7 +236,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
               key={loc.city}
               type="button"
               aria-pressed={isSelected}
-              onClick={() => onSelectLocation(loc)}
+              onClick={() => handleSelect(loc)}
               className={`px-2.5 py-1 rounded-full whitespace-nowrap border transition-all text-xs font-medium ${
                 isSelected
                   ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-sm'

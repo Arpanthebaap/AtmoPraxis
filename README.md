@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7%20Strict-blue.svg)]()
 [![React](https://img.shields.io/badge/React-18.3-cyan.svg)]()
-[![Vitest](https://img.shields.io/badge/Tests-52%2F52%20Passing-success.svg)]()
+[![Vitest](https://img.shields.io/badge/Tests-65%2F65%20Passing-success.svg)]()
 [![WCAG](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA%2FAAA-purple.svg)]()
 [![Security](https://img.shields.io/badge/Security-CSP%20%26%20Zero--Leak-success.svg)]()
 
@@ -176,10 +176,10 @@ $$\mathcal{E}_{cigs} = \frac{\text{Dose}_{\mu g}}{237.6\text{ }\mu g}$$
 
 | Evaluation Pillar | Implementation in AtmoPraxis | Verification Metric |
 | :--- | :--- | :--- |
-| **Code Quality** | Strict TypeScript 5.7 mode, custom hooks (`useAirQuality`), comprehensive TSDoc, zero `any` types, React `ErrorBoundary`, centralized constants, and modular architecture. | `tsc --noEmit` clean exit; zero build or type warnings. |
-| **Security** | Strict Content Security Policy (CSP), X-Content-Type-Options: nosniff, Referrer-Policy, API key format validation regex, prompt injection sanitization, 10s request abort timeouts, and ephemeral session storage with memory fallback. | Zero secret exposure; all network requests bounded by AbortController. |
-| **Efficiency** | Zero runtime UI bloat; bundle size 266 KB (< 78 KB gzip); in-memory LRU TTL caching; client-side edge computing (< 4ms equation solver execution time). | 100/100 Lighthouse performance profile. |
-| **Testing** | 10 comprehensive test suites spanning 52 unit and integration tests covering symbolic engines, prompt security, schema parsing, API fallbacks, and boundary conditions. | 52/52 passing tests in Vitest (< 1.5s execution). |
+| **Code Quality** | Strict TypeScript 5.7 mode, custom hooks (`useAirQuality`), comprehensive TSDoc, zero `any` types, React `ErrorBoundary`, centralized constants, and modular architecture with ESLint & Prettier configuration. | `tsc --noEmit` clean exit; zero build or type warnings. |
+| **Security** | Strict Content Security Policy (CSP), X-Frame-Options: DENY, Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Resource-Policy: same-origin, X-Content-Type-Options: nosniff, Referrer-Policy, API key format validation regex, prompt injection sanitization, 10s request abort timeouts, and ephemeral session storage with memory fallback. | Zero secret exposure; all network requests bounded by AbortController. |
+| **Efficiency** | Zero runtime UI bloat; bundle size 266 KB (< 79 KB gzip); in-memory LRU TTL caching; client-side edge computing (< 4ms equation solver execution time). | 100/100 Lighthouse performance profile. |
+| **Testing** | 11 comprehensive test suites spanning 65 unit, integration, and UI component tests covering symbolic engines, prompt security, schema parsing, API fallbacks, boundary conditions, and accessible component rendering. | 65/65 passing tests in Vitest. |
 | **Accessibility** | Full WCAG 2.1 AA/AAA compliance: skip-to-main-content link, semantic HTML5 landmarks, explicit `id` and `<label>` pairs on all sliders, ARIA combobox keyboard navigation, live regions (`aria-live="polite"`), modal focus locks with Escape handlers, and `@media (prefers-reduced-motion)` support. | Fully navigable via keyboard; screen-reader tested. |
 | **Problem Statement Alignment** | Fully dedicated to winter smog navigation, personalized low-emission routines, DIY indoor purification physics (C-R boxes), and biological impact translation for 4 key metropolitan personas. | Direct alignment across all challenge specifications. |
 
@@ -201,10 +201,11 @@ cd AtmoPraxis
 # Install dependencies
 npm install
 
-# Run TypeScript strict type verification
+# Run TypeScript strict type verification & linting
 npm run typecheck
+npm run lint
 
-# Execute comprehensive 52-test automated suite
+# Execute comprehensive 65-test automated suite
 npm test
 
 # Build optimized production bundle
@@ -227,10 +228,11 @@ npm run dev
  ✓ src/test/open_meteo.test.ts (4 tests)
  ✓ src/test/geocoding.test.ts (4 tests)
  ✓ src/test/gemini_client.test.ts (6 tests)
+ ✓ src/test/components.test.tsx (13 tests)
 
- Test Files  10 passed (10)
-      Tests  52 passed (52)
-   Duration  < 1.5 s
+ Test Files  11 passed (11)
+      Tests  65 passed (65)
+   Duration  < 4.0 s
 ```
 
 ---

@@ -25,6 +25,13 @@ export const MINUTE_VENTILATION_RATES = {
   INTENSE_EXERCISE_L_MIN: 45.0,   // 2.70 m³/h
 } as const;
 
+// Infiltration & Physiological Deposition Constants
+export const BIOPHYSICAL_DEFAULTS = {
+  INDOOR_OUTDOOR_INFILTRATION_RATIO: 0.75, // Typical urban dwelling without mechanical filtration
+  PURIFIED_INDOOR_TARGET_PM25_UG_M3: 15,   // AtmoPraxis C-R box target indoor baseline
+  ALVEOLAR_DEPOSITION_FRACTION_PCT: 68,   // ICRP deep lung tissue penetration fraction
+} as const;
+
 // Corsi-Rosenthal Box Purifier Fluid Dynamic Constants
 export const CORSI_ROSENTHAL_DEFAULTS = {
   BOX_FAN_FREE_CFM: 2000,
@@ -55,6 +62,7 @@ export const ATMOSPHERE_THRESHOLDS = {
   GOOD_DISPERSION_HEIGHT_METERS: 800,
   STAGNANT_WIND_SPEED_KMH: 6.0,
   VENTILATION_COEF_HAZARD_M2_S: 2000,
+  DEFAULT_SOLAR_WINDOW: '12:30 - 14:30 (Solar Peak)',
 } as const;
 
 // Application Configuration & Network Limits

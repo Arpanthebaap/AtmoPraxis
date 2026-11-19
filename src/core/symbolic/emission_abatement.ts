@@ -81,18 +81,36 @@ export const INITIAL_SUSTAINABLE_HABITS: SustainableHabit[] = [
   },
 ];
 
-export function computeTotalEmissionSavings(habits: SustainableHabit[]): {
+export interface EmissionSavingsSummary {
   totalPm25SavedGrams: number;
   totalCo2eSavedKg: number;
   activeHabitCount: number;
   totalHabits: number;
   communityMultiplierGramsMonth: number;
-} {
+}
+
+/**
+ * Computes individual daily pollutant abatement and projects neighborhood collective impact.
+ *
+ * @param habits Array of sustainable habit profiles with adoption state.
+ * @returns Summary of abated PM2.5, avoided CO2e, and 500-household community multiplier.
+ */
+export function computeTotalEmissionSavings(habits: SustainableHabit[]): EmissionSavingsSummary {
+  if (!Array.isArray(habits) || habits.length === 0) {
+    return {
+      totalPm25SavedGrams: 0,
+      totalCo2eSavedKg: 0,
+      activeHabitCount: 0,
+      totalHabits: 0,
+      communityMultiplierGramsMonth: 0,
+    };
+  }
+
   const active = habits.filter(h => h.adopted);
   const totalPm25SavedGrams = Number(active.reduce((acc, h) => acc + h.dailyPm25ReductionGrams, 0).toFixed(1));
   const totalCo2eSavedKg = Number(active.reduce((acc, h) => acc + h.dailyCo2eReductionKg, 0).toFixed(1));
   
-  // If 500 households in the community adopt this routine over 1 month:
+  // If 500 households in the community adopt this routine over 1 month (30 days):
   const communityMultiplierGramsMonth = Math.round(totalPm25SavedGrams * 500 * 30);
 
   return {

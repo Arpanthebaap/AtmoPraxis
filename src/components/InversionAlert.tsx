@@ -2,12 +2,18 @@ import React from 'react';
 import { ShieldAlert, Sun, Clock, Layers, ArrowUpRight } from 'lucide-react';
 import { AtmosphericDynamics, HourlyForecastPoint } from '../types';
 import { evaluateInversionSafety } from '../core/symbolic/thermal_inversion';
+import { ATMOSPHERE_THRESHOLDS } from '../constants';
 
-interface InversionAlertProps {
+export interface InversionAlertProps {
   atmosphere: AtmosphericDynamics;
   hourly: HourlyForecastPoint[];
 }
 
+/**
+ * Tropospheric Thermal Inversion & Planetary Boundary Layer (PBL) Alert.
+ * Visualizes boundary layer mixing height, nocturnal smog lock trapping risks,
+ * ventilation coefficients, and the optimal solar convection ventilation window.
+ */
 export const InversionAlert: React.FC<InversionAlertProps> = ({ atmosphere, hourly }) => {
   const analysis = evaluateInversionSafety(atmosphere);
 
@@ -18,7 +24,7 @@ export const InversionAlert: React.FC<InversionAlertProps> = ({ atmosphere, hour
       ? `${String(optimalHours[0].hour).padStart(2, '0')}:00 - ${String(
           optimalHours[optimalHours.length - 1].hour + 1
         ).padStart(2, '0')}:00`
-      : '12:30 - 14:30 (Solar Peak)';
+      : ATMOSPHERE_THRESHOLDS.DEFAULT_SOLAR_WINDOW;
 
   return (
     <section 
@@ -35,15 +41,15 @@ export const InversionAlert: React.FC<InversionAlertProps> = ({ atmosphere, hour
             }`}
           >
             {analysis.isTrappingActive ? (
-              <ShieldAlert className="w-5 h-5" />
+              <ShieldAlert className="w-5 h-5" aria-hidden="true" />
             ) : (
-              <Sun className="w-5 h-5" />
+              <Sun className="w-5 h-5" aria-hidden="true" />
             )}
           </div>
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-bold text-white">
-                Tropospheric Thermal Inversion & Smog Trapping Engine
+                Tropospheric Thermal Inversion &amp; Smog Trapping Engine
               </h2>
               <span
                 className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
@@ -66,8 +72,11 @@ export const InversionAlert: React.FC<InversionAlertProps> = ({ atmosphere, hour
         </div>
 
         {/* Optimal Window Banner */}
-        <div className="flex items-center space-x-3 bg-emerald-950/40 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs">
-          <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+        <div 
+          aria-label={`Solar clearance ventilation window: ${windowStr}`}
+          className="flex items-center space-x-3 bg-emerald-950/40 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs"
+        >
+          <Clock className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
           <div>
             <span className="text-slate-400">Solar Clearance Window: </span>
             <strong className="text-emerald-300 font-mono">{windowStr}</strong>
@@ -77,92 +86,52 @@ export const InversionAlert: React.FC<InversionAlertProps> = ({ atmosphere, hour
 
       {/* Physics explanation & Action Callout */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-5">
-        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
+        <div 
+          aria-label={`Boundary Layer Height: ${atmosphere.boundaryLayerHeight} meters`}
+          className="p-4 rounded-xl bg-slate-950 border border-slate-800/80"
+        >
           <div className="text-xs font-semibold text-slate-400 flex items-center space-x-1.5 mb-1.5">
-            <Layers className="w-4 h-4 text-emerald-400" />
+            <Layers className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             <span>Boundary Layer Height (PBL)</span>
           </div>
           <div className="text-2xl font-bold font-mono text-white">
             {atmosphere.boundaryLayerHeight} <span className="text-xs font-normal text-slate-400">meters</span>
           </div>
           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-            {atmosphere.boundaryLayerHeight < 300
+            {atmosphere.boundaryLayerHeight < ATMOSPHERE_THRESHOLDS.CRITICAL_MIXING_HEIGHT_METERS
               ? 'Severe vertical compression: emissions cannot escape and pool at ground breathing level.'
               : 'Vertical convection active: solar heating lofts particulates away from street level.'}
           </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
+        <div 
+          aria-label={`Ventilation Coefficient: ${analysis.ventilationCoefficient} square meters per second`}
+          className="p-4 rounded-xl bg-slate-950 border border-slate-800/80"
+        >
           <div className="text-xs font-semibold text-slate-400 flex items-center space-x-1.5 mb-1.5">
-            <ArrowUpRight className="w-4 h-4 text-teal-400" />
+            <ArrowUpRight className="w-4 h-4 text-teal-400" aria-hidden="true" />
             <span>Ventilation Coefficient</span>
           </div>
           <div className="text-2xl font-bold font-mono text-white">
             {analysis.ventilationCoefficient} <span className="text-xs font-normal text-slate-400">m²/s</span>
           </div>
           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-            {analysis.ventilationCoefficient < 2000
-              ? 'Critical stagnation (VC < 2,000 m²/s): wind shear is insufficient to disperse localized plumes.'
-              : 'Adequate ventilation: wind speed aids rapid cross-basin flushing.'}
+            {analysis.ventilationCoefficient < ATMOSPHERE_THRESHOLDS.VENTILATION_COEF_HAZARD_M2_S
+              ? 'Hazardous stagnation: low dispersion rate traps vehicle exhaust and biomass smoke.'
+              : 'Adequate atmospheric transport: wind and convection dilute ground concentrations.'}
           </p>
         </div>
 
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
-          <div className="text-xs font-semibold text-slate-400 flex items-center space-x-1.5 mb-1.5">
-            <Sun className="w-4 h-4 text-amber-400" />
-            <span>Recommended Protocol</span>
+          <div className="text-xs font-semibold text-slate-400 mb-1.5">
+            Recommended Action Protocol
           </div>
-          <p className="text-xs font-medium text-slate-200 mt-1 leading-relaxed">
+          <p className="text-xs font-medium text-emerald-300 leading-relaxed">
             {analysis.recommendedOutdoorAction}
           </p>
-        </div>
-      </div>
-
-      {/* Hourly 24-Hour Inversion & Smog Bar Timeline */}
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-          <span className="font-semibold uppercase tracking-wider text-[11px]">
-            24-Hour Diurnal Smog & Inversion Forecast
-          </span>
-          <span className="text-[11px] text-slate-500">Green highlight denotes optimal outdoor window</span>
-        </div>
-
-        <div className="grid grid-cols-12 sm:grid-cols-24 gap-1 overflow-x-auto pb-1">
-          {hourly.slice(0, 24).map((h) => {
-            const isHighlight = h.isRecommendedOutdoorWindow;
-            const heightPercent = Math.min(100, Math.max(15, (h.aqiUs / 350) * 100));
-
-            return (
-              <div
-                key={h.time}
-                className={`flex flex-col items-center justify-end p-1 rounded-md text-[10px] transition-all ${
-                  isHighlight
-                    ? 'bg-emerald-950/60 border border-emerald-500/40'
-                    : 'bg-slate-950/60 border border-slate-800/60'
-                }`}
-                title={`Hour ${String(h.hour).padStart(2, '0')}:00 | AQI: ${h.aqiUs} | PM2.5: ${
-                  h.pm25
-                } µg/m³ | Inversion: ${h.inversionRisk}`}
-              >
-                {/* Visual Smog Column Bar */}
-                <div className="w-full bg-slate-800/60 h-16 rounded flex items-end overflow-hidden mb-1">
-                  <div
-                    className={`w-full rounded-t transition-all ${
-                      h.aqiUs > 200
-                        ? 'bg-rose-500'
-                        : h.aqiUs > 100
-                        ? 'bg-amber-500'
-                        : 'bg-emerald-500'
-                    }`}
-                    style={{ height: `${heightPercent}%` }}
-                  />
-                </div>
-
-                <span className="font-mono font-bold text-slate-200">{h.hour}h</span>
-                <span className="font-mono text-[9px] text-slate-400">{h.aqiUs}</span>
-              </div>
-            );
-          })}
+          <p className="text-[11px] text-slate-500 mt-2">
+            {analysis.scientificExplanation}
+          </p>
         </div>
       </div>
     </section>

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { X, Printer, Calendar, FileText } from 'lucide-react';
 import { AirQualityState, AqiStandard } from '../types';
 
-interface ExportDossierModalProps {
+export interface ExportDossierModalProps {
   isOpen: boolean;
   onClose: () => void;
   state: AirQualityState;
@@ -12,6 +12,7 @@ interface ExportDossierModalProps {
 /**
  * Accessible modal dialog for exporting the Clean Air Daily Dossier
  * and downloading RFC 5545 iCalendar (.ics) files.
+ * Implements focus locking, Escape key listeners, and memory leak cleanup.
  */
 export const ExportDossierModal: React.FC<ExportDossierModalProps> = ({
   isOpen,
@@ -78,12 +79,20 @@ END:VEVENT
 END:VCALENDAR`;
 
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const safeCity = state.location.city.replace(/[^a-zA-Z0-9_\-]/g, '_');
+
     const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.setAttribute('download', `AtmoPraxis_Routine_${state.location.city}.ics`);
+    link.href = objectUrl;
+    link.setAttribute('download', `AtmoPraxis_Routine_${safeCity}.ics`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // Prevent memory leaks by revoking object URL after download trigger
+    setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+    }, 1000);
   };
 
   return (

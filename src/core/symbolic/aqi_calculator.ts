@@ -1,6 +1,6 @@
 import { AqiCategory, PollutantReadings } from '../../types';
 
-interface Breakpoint {
+export interface Breakpoint {
   cLow: number;
   cHigh: number;
   iLow: number;
@@ -8,7 +8,7 @@ interface Breakpoint {
 }
 
 // US EPA Breakpoints for PM2.5 (24-hour average in µg/m³) - 2024 updated standards
-const US_EPA_PM25_BREAKPOINTS: Breakpoint[] = [
+export const US_EPA_PM25_BREAKPOINTS: Breakpoint[] = [
   { cLow: 0.0, cHigh: 9.0, iLow: 0, iHigh: 50 },
   { cLow: 9.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
   { cLow: 35.5, cHigh: 55.4, iLow: 101, iHigh: 150 },
@@ -19,7 +19,7 @@ const US_EPA_PM25_BREAKPOINTS: Breakpoint[] = [
 ];
 
 // US EPA Breakpoints for PM10 (24-hour average in µg/m³)
-const US_EPA_PM10_BREAKPOINTS: Breakpoint[] = [
+export const US_EPA_PM10_BREAKPOINTS: Breakpoint[] = [
   { cLow: 0, cHigh: 54, iLow: 0, iHigh: 50 },
   { cLow: 55, cHigh: 154, iLow: 51, iHigh: 100 },
   { cLow: 155, cHigh: 254, iLow: 101, iHigh: 150 },
@@ -30,7 +30,7 @@ const US_EPA_PM10_BREAKPOINTS: Breakpoint[] = [
 ];
 
 // India National AQI (NAQI CPCB) Breakpoints for PM2.5 (in µg/m³)
-const INDIA_PM25_BREAKPOINTS: Breakpoint[] = [
+export const INDIA_PM25_BREAKPOINTS: Breakpoint[] = [
   { cLow: 0, cHigh: 30, iLow: 0, iHigh: 50 },
   { cLow: 31, cHigh: 60, iLow: 51, iHigh: 100 },
   { cLow: 61, cHigh: 90, iLow: 101, iHigh: 200 },
@@ -40,7 +40,7 @@ const INDIA_PM25_BREAKPOINTS: Breakpoint[] = [
 ];
 
 // India NAQI Breakpoints for PM10 (in µg/m³)
-const INDIA_PM10_BREAKPOINTS: Breakpoint[] = [
+export const INDIA_PM10_BREAKPOINTS: Breakpoint[] = [
   { cLow: 0, cHigh: 50, iLow: 0, iHigh: 50 },
   { cLow: 51, cHigh: 100, iLow: 51, iHigh: 100 },
   { cLow: 101, cHigh: 250, iLow: 101, iHigh: 200 },
@@ -50,11 +50,15 @@ const INDIA_PM10_BREAKPOINTS: Breakpoint[] = [
 ];
 
 /**
- * Standard piecewise linear interpolation formula:
+ * Standard piecewise linear interpolation formula for Air Quality Sub-Index:
  * Ip = [ (IHi - ILo) / (BPHi - BPLo) ] * (Cp - BPLo) + ILo
+ *
+ * @param concentration Pollutant mass concentration in ambient air.
+ * @param breakpoints Table of regulatory breakpoint bounds.
+ * @returns Evaluated integer sub-index score.
  */
 export function calculateSubIndex(concentration: number, breakpoints: Breakpoint[]): number {
-  if (concentration <= 0) return 0;
+  if (concentration <= 0 || !Array.isArray(breakpoints) || breakpoints.length === 0) return 0;
 
   for (const bp of breakpoints) {
     if (concentration >= bp.cLow && concentration <= bp.cHigh) {
@@ -63,7 +67,7 @@ export function calculateSubIndex(concentration: number, breakpoints: Breakpoint
     }
   }
 
-  // Beyond maximum defined breakpoint (Extreme emergency category)
+  // Beyond maximum defined breakpoint (Extreme emergency category capped at 999)
   const last = breakpoints[breakpoints.length - 1];
   if (concentration > last.cHigh) {
     const scaleFactor = concentration / last.cHigh;
@@ -73,6 +77,12 @@ export function calculateSubIndex(concentration: number, breakpoints: Breakpoint
   return 0;
 }
 
+/**
+ * Calculates US EPA composite Air Quality Index and identifies the primary risk driver.
+ *
+ * @param pollutants Current measured concentration of ambient atmospheric pollutants.
+ * @returns Overall composite AQI value and dominant pollutant name.
+ */
 export function calculateUsAqi(pollutants: PollutantReadings): { aqi: number; dominant: string } {
   const pm25Sub = calculateSubIndex(pollutants.pm25, US_EPA_PM25_BREAKPOINTS);
   const pm10Sub = calculateSubIndex(pollutants.pm10, US_EPA_PM10_BREAKPOINTS);
@@ -84,6 +94,12 @@ export function calculateUsAqi(pollutants: PollutantReadings): { aqi: number; do
   }
 }
 
+/**
+ * Calculates India National Air Quality Index (NAQI CPCB) and dominant pollutant.
+ *
+ * @param pollutants Current measured concentration of ambient atmospheric pollutants.
+ * @returns Overall composite AQI value and dominant pollutant name.
+ */
 export function calculateIndiaNaqi(pollutants: PollutantReadings): { aqi: number; dominant: string } {
   const pm25Sub = calculateSubIndex(pollutants.pm25, INDIA_PM25_BREAKPOINTS);
   const pm10Sub = calculateSubIndex(pollutants.pm10, INDIA_PM10_BREAKPOINTS);
@@ -95,6 +111,12 @@ export function calculateIndiaNaqi(pollutants: PollutantReadings): { aqi: number
   }
 }
 
+/**
+ * Maps numerical AQI score to standardized health hazard classification.
+ *
+ * @param aqi Numerical Air Quality Index value.
+ * @returns Human-readable health category classification.
+ */
 export function getAqiCategory(aqi: number): AqiCategory {
   if (aqi <= 50) return 'Good';
   if (aqi <= 100) return 'Moderate';
@@ -105,6 +127,12 @@ export function getAqiCategory(aqi: number): AqiCategory {
   return 'Severe+';
 }
 
+/**
+ * Returns Tailwind CSS styling classes and hex color code for a given AQI category.
+ *
+ * @param category Evaluated AQI category name.
+ * @returns Object with background, text, border CSS classes and hex code.
+ */
 export function getAqiColorCode(category: AqiCategory): {
   bg: string;
   text: string;

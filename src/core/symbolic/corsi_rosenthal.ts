@@ -1,4 +1,5 @@
 import { CorsiRosenthalConfig, CorsiRosenthalMetrics } from '../../types';
+import { CORSI_ROSENTHAL_DEFAULTS } from '../../constants';
 
 /**
  * Deterministic Corsi-Rosenthal Box Fan Filtration & Room CADR Solver.
@@ -11,37 +12,42 @@ import { CorsiRosenthalConfig, CorsiRosenthalMetrics } from '../../types';
  * Mathematical Formulation:
  * 1. Room Volume: V_room = L * W * H (cubic feet)
  * 2. Effective CADR: CADR = Q_fan_loaded * SinglePassEfficiency
- *    - MERV-13 single-pass particle removal efficiency for 0.3 - 2.5 µm is ~80% - 85%
+ *    - MERV-13 single-pass particle removal efficiency for 0.3 - 2.5 µm is ~82%
  *    - 4-filter plenum achieves ~450 - 550 CFM on medium/high speed.
  * 3. Air Changes per Hour (ACH): ACH = (CADR * 60) / V_room
  * 4. Exponential Decay Law: C(t) = C_0 * e^(-ACH * t)
  *    - Half-life (50% reduction): t_half = ln(2) / ACH * 60 (minutes)
  *    - 90% reduction: t_90 = -ln(0.10) / ACH * 60 (minutes)
  *    - 99% reduction: t_99 = -ln(0.01) / ACH * 60 (minutes)
+ *
+ * @param config Specification of room dimensions, fan speed, filter rating, and carbon pad.
+ * @returns Computed metrics including effective CADR, ACH, aerosol clearance times, and DIY build cost.
  */
-
 export function calculateCorsiRosenthalMetrics(config: CorsiRosenthalConfig): CorsiRosenthalMetrics {
-  const roomVolumeCuFt = Math.round(config.roomLengthFt * config.roomWidthFt * config.roomHeightFt);
+  const roomVolumeCuFt = Math.max(0, Math.round(config.roomLengthFt * config.roomWidthFt * config.roomHeightFt));
   const roomVolumeM3 = Number((roomVolumeCuFt * 0.0283168).toFixed(1));
 
-  // Determine fan speed air flow multiplier
-  let speedMultiplier = 1.0; // High speed default
-  if (config.fanSpeedSetting === 'Medium') speedMultiplier = 0.78;
-  if (config.fanSpeedSetting === 'Low') speedMultiplier = 0.55;
+  // Determine fan speed air flow multiplier from centralized constants
+  const speedMultiplier = CORSI_ROSENTHAL_DEFAULTS.SPEED_MULTIPLIERS[config.fanSpeedSetting] ?? 1.0;
 
   // MERV filtration efficiency for fine aerosol / PM2.5 (0.3 - 2.5 micron)
-  const filterEfficiency = config.filterMerv === 14 ? 0.90 : 0.82;
+  const filterEfficiency = config.filterMerv === 14 
+    ? CORSI_ROSENTHAL_DEFAULTS.FILTER_EFFICIENCY.MERV14 
+    : CORSI_ROSENTHAL_DEFAULTS.FILTER_EFFICIENCY.MERV13;
 
   // 4 vs 5 filter surface area factor:
-  // 5 filters (4 sides + 1 bottom) lowers face resistance further by 18%
-  const surfaceAreaFactor = config.filterCount === 5 ? 1.15 : 1.0;
+  // 5 filters (4 sides + 1 bottom) lowers face resistance further by 15-18%
+  const surfaceAreaFactor = config.filterCount === 5 
+    ? CORSI_ROSENTHAL_DEFAULTS.SURFACE_AREA_FACTOR_5_FILTER 
+    : 1.0;
 
   // Carbon pad resistance penalty (carbon adds slight flow impedance ~6%, but removes NO2 & VOCs)
-  const carbonImpedance = config.hasCarbonLayer ? 0.94 : 1.0;
+  const carbonImpedance = config.hasCarbonLayer 
+    ? CORSI_ROSENTHAL_DEFAULTS.CARBON_PAD_IMPEDANCE 
+    : 1.0;
 
-  // Realistic loaded CFM for standard 20-inch box fan (e.g. Lasko 3720 / 3733)
-  // Free air is ~2000 CFM, loaded across 4 MERV-13 filters with shroud is ~580 CFM on high
-  const baseLoadedFlowCfm = 580;
+  // Realistic loaded CFM for standard 20-inch box fan (e.g. Lasko 3720 / 3733 with front cardboard shroud)
+  const baseLoadedFlowCfm = CORSI_ROSENTHAL_DEFAULTS.BOX_FAN_LOADED_HIGH_CFM;
   const effectiveCadrCfm = Math.round(
     baseLoadedFlowCfm * speedMultiplier * surfaceAreaFactor * filterEfficiency * carbonImpedance
   );
@@ -72,13 +78,14 @@ export function calculateCorsiRosenthalMetrics(config: CorsiRosenthalConfig): Co
     timeToClean99PctMinutes = Number(((4.6052 / airChangesPerHour) * 60).toFixed(1));
   }
 
-  // Cost calculation (USD)
-  // Box fan: ~$22, MERV-13 filters: ~$12 each, Duct tape/shroud cardboard: ~$6, Carbon pad: ~$15
-  const fanCost = 22;
-  const filterUnitCost = config.filterMerv === 14 ? 16 : 12;
+  // Cost calculation (USD) from centralized constants
+  const fanCost = CORSI_ROSENTHAL_DEFAULTS.COSTS.FAN_USD;
+  const filterUnitCost = config.filterMerv === 14 
+    ? CORSI_ROSENTHAL_DEFAULTS.COSTS.MERV14_FILTER_USD 
+    : CORSI_ROSENTHAL_DEFAULTS.COSTS.MERV13_FILTER_USD;
   const filtersTotalCost = config.filterCount * filterUnitCost;
-  const carbonCost = config.hasCarbonLayer ? 15 : 0;
-  const miscCost = 6;
+  const carbonCost = config.hasCarbonLayer ? CORSI_ROSENTHAL_DEFAULTS.COSTS.CARBON_PAD_USD : 0;
+  const miscCost = CORSI_ROSENTHAL_DEFAULTS.COSTS.SHROUD_AND_TAPE_USD;
   const estimatedBuildCostUsd = fanCost + filtersTotalCost + carbonCost + miscCost;
 
   // Filter lifespan: under severe winter smog (daily AQI > 200), typical life is 90-120 days.
@@ -99,12 +106,15 @@ export function calculateCorsiRosenthalMetrics(config: CorsiRosenthalConfig): Co
   };
 }
 
+/**
+ * Returns baseline configuration representing a standard master bedroom C-R box setup.
+ */
 export function getDefaultCorsiRosenthalConfig(): CorsiRosenthalConfig {
   return {
     roomLengthFt: 16,
     roomWidthFt: 14,
     roomHeightFt: 9,
-    fanNominalCfm: 2000,
+    fanNominalCfm: CORSI_ROSENTHAL_DEFAULTS.BOX_FAN_FREE_CFM,
     filterCount: 4,
     filterMerv: 13,
     hasCarbonLayer: true,

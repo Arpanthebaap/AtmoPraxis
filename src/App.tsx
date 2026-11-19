@@ -38,6 +38,22 @@ export const AppContent: React.FC = () => {
     refresh,
   } = useAirQuality();
 
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    const tabs: ActiveTab[] = ['routine', 'purifier', 'habits', 'impact'];
+    const currentIndex = tabs.indexOf(activeTab);
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextTab = tabs[(currentIndex + 1) % tabs.length];
+      setActiveTab(nextTab);
+      document.getElementById(`tab-${nextTab}`)?.focus();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevTab = tabs[(currentIndex - 1 + tabs.length) % tabs.length];
+      setActiveTab(prevTab);
+      document.getElementById(`tab-${prevTab}`)?.focus();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       {/* Skip to Main Content Link for WCAG 2.1 AA Keyboard Accessibility */}
@@ -96,6 +112,7 @@ export const AppContent: React.FC = () => {
         <div
           role="tablist"
           aria-label="AtmoPraxis Core Features"
+          onKeyDown={handleTabKeyDown}
           className="border-b border-slate-800 flex items-center space-x-1 sm:space-x-4 overflow-x-auto pb-px"
         >
           <button
